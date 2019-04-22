@@ -1,0 +1,106 @@
+---
+title: "Ranking safety based on US Arrests"
+author: "Cristina Zaldumbide"
+date: "4/22/2019"
+output: pdf_document
+---
+The dataset USArrests built into R Studio contains information of violent crime rates by US State. Specifically, the data set contains statistics, in arrests pero 100,000 residents for assualt, murder, and rape in each of the 50 US states from 1973. In addition, the percent of the population living in urban areas are given.
+
+Data frame with 50 observations on 4 variables:
+
+* Murder     :   Murder arrests (per 100,000)
+
+* Assualt    :   Assualt arrests (per 100,000)
+
+* UrbanPop   :   Percent urban population
+
+* Rape       :   Rape arrests (per 100,000)
+
+Objective of this study is to create a model to assess states "safety" and rank them accordingly. 
+
+# Download data
+```{r}
+data("USArrests")
+attach(USArrests)
+```
+
+# Overview of data
+```{r}
+source("summary.info.R")
+summary.info(USArrests)
+```
+
+#Principal Component Analysis
+This analysis will include principal components. First it is important to take into account that 
+scaling is not always desirable. In this case, murder, rape and assualt have same units(occurrences per 100,000 people) therefore it is reasonable to compare them, yet UrbanPop is measured as a percentage of total population so here scaling would allow for a better comparison. 
+
+
+```{r}
+pca.arrests<-prcomp(USArrests, scale=TRUE)
+pca.arrests
+#adjust eigenvector and scores direction
+pca.arrests$rotation <- -pca.arrests$rotation
+pca.arrests$x <- -pca.arrests$x 
+pca.arrests$rotation
+head(pca.arrests$x)
+```
+
+
+#choosing number of PC
+It is crucial to see the porpotion of variance exlpained by each principal component.
+```{r}
+var=summary(pca.arrests)
+
+# PVE (aka scree) plot
+PVEplot <- qplot(c(1:4), var$importance[2,]) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Pproportion of Variance Explained") +
+  ggtitle("Scree Plot") +
+  ylim(0, 1)
+
+# Cumulative PVE plot
+cumPVE <- qplot(c(1:4), var$importance[3,]) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab(NULL) + 
+  ggtitle("Cumulative Scree Plot") +
+  ylim(0,1)
+par(mfrow=c(1,2))
+PVEplot
+cumPVE
+```
+
+There is no rule here on how to decide. By reducing to 2 variables, we are still accounting for about 87% of variability.
+
+First principal component can be interpeted as the serious crimes. Meanwhile, Second principal component roughly corresponds to urbanization criteria.
+
+#plotting first 2 PC 
+```{r}
+
+scores<-data.frame(State=row.names(USArrests),pca.arrests$x[,1:2])
+row.names(scores) <- NULL
+scores
+
+ggplot(scores, aes(scores$PC1, scores$PC2)) + 
+  modelr::geom_ref_line(h = 0) +
+  modelr::geom_ref_line(v = 0) +
+  geom_text(aes(label = State), size = 3) +
+  xlab("1st Principal Component") + 
+  ylab("2nd Principal Component") + 
+  ggtitle("First 2 Principal Components of USArrests Data")
+
+biplot(pca.arrests, scale = 0)
+
+```
+
+#ranking of states based on PC1
+```{r}
+rank_states<-scores[order(scores$PC1),]
+#most dangerous
+head(rank_states[,1], 10)
+#Safest states
+rev(tail(rank_states[,1], 10))
+
+```
+
